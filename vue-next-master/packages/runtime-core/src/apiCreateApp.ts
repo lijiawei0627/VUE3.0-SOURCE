@@ -111,6 +111,7 @@ export type CreateAppFunction<HostElement> = (
 
 let uid = 0
 
+ // createApp createApp 方法接受的两个参数：根组件的对象和 prop
 export function createAppAPI<HostElement>(
   render: RootRenderFunction,
   hydrate?: RootHydrateFunction
@@ -212,6 +213,7 @@ export function createAppAPI<HostElement>(
 
       mount(rootContainer: HostElement, isHydrate?: boolean): any {
         if (!isMounted) {
+          // 创建vnode
           const vnode = createVNode(
             rootComponent as ConcreteComponent,
             rootProps

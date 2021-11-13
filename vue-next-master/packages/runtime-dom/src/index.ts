@@ -29,6 +29,7 @@ let renderer: Renderer<Element> | HydrationRenderer
 
 let enabledHydration = false
 
+// 延时创建渲染器，当用户只依赖响应式包的时候，可以通过 tree-shaking 移除核心渲染逻辑相关的代码
 function ensureRenderer() {
   return renderer || (renderer = createRenderer<Node, Element>(rendererOptions))
 }
@@ -51,6 +52,7 @@ export const hydrate = ((...args) => {
 }) as RootHydrateFunction
 
 export const createApp = ((...args) => {
+  // 创建 app 对象
   const app = ensureRenderer().createApp(...args)
 
   if (__DEV__) {
@@ -58,7 +60,11 @@ export const createApp = ((...args) => {
   }
 
   const { mount } = app
+  // 重写 app.mount 方法
   app.mount = (containerOrSelector: Element | string): any => {
+    // 通过 normalizeContainer 标准化容器
+    // 开发者可以给mout方法传字符串选择器或者 DOM 对象作为参数，
+    // 但如果是字符串选择器，就需要把它转成 DOM 对象，作为最终挂载的容器
     const container = normalizeContainer(containerOrSelector)
     if (!container) return
     const component = app._component

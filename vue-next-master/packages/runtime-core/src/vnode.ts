@@ -245,6 +245,7 @@ export function isVNode(value: any): value is VNode {
   return value ? value.__v_isVNode === true : false
 }
 
+ // n1 和 n2 节点的 type 和 key 都相同，才是相同节点
 export function isSameVNodeType(n1: VNode, n2: VNode): boolean {
   if (
     __DEV__ &&
@@ -301,6 +302,7 @@ export const createVNode = (__DEV__
   ? createVNodeWithArgsTransform
   : _createVNode) as typeof _createVNode
 
+  // 创建VNode
 function _createVNode(
   type: VNodeTypes | ClassComponent | typeof NULL_DYNAMIC_COMPONENT,
   props: (Data & VNodeProps) | null = null,
@@ -316,9 +318,11 @@ function _createVNode(
     type = Comment
   }
 
+  // 如果是vnode，直接cloneVNode即可
   if (isVNode(type)) {
     const cloned = cloneVNode(type, props)
     if (children) {
+       // 标准化子节点，把不同数据类型的 children 转成数组或者文本类型
       normalizeChildren(cloned, children)
     }
     return cloned
@@ -331,12 +335,14 @@ function _createVNode(
 
   // class & style normalization.
   if (props) {
+    // 处理 props 相关逻辑，标准化 class 和 style
     // for reactive or proxy objects, we need to clone it to enable mutation.
     if (isProxy(props) || InternalObjectKey in props) {
       props = extend({}, props)
     }
     let { class: klass, style } = props
     if (klass && !isString(klass)) {
+      // 标准化 class
       props.class = normalizeClass(klass)
     }
     if (isObject(style)) {
@@ -345,11 +351,14 @@ function _createVNode(
       if (isProxy(style) && !isArray(style)) {
         style = extend({}, style)
       }
+      // 标准化style
       props.style = normalizeStyle(style)
     }
   }
 
   // encode the vnode type information into a bitmap
+  // 将VNode的类型信息进行编码,
+  // 以便在后面的 `patch` 阶段，可以根据不同的类型执行相应的处理逻辑
   const shapeFlag = isString(type)
     ? ShapeFlags.ELEMENT
     : __FEATURE_SUSPENSE__ && isSuspense(type)
@@ -403,7 +412,7 @@ function _createVNode(
   if (__DEV__ && vnode.key !== vnode.key) {
     warn(`VNode created with invalid key (NaN). VNode type:`, vnode.type)
   }
-
+  // 标准化子节点，把不同数据类型的 children 转成数组或者文本类型
   normalizeChildren(vnode, children)
 
   if (

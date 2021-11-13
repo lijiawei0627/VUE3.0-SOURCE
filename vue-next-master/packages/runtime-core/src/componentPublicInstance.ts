@@ -217,7 +217,6 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
       type,
       appContext
     } = instance
-
     // let @vue/reactivity know it should never observe Vue public instances.
     if (key === ReactiveFlags.SKIP) {
       return true
@@ -229,10 +228,16 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
     // is the multiple hasOwn() calls. It's much faster to do a simple property
     // access on a plain object, so we use an accessCache object (with null
     // prototype) to memoize what access type a key corresponds to.
+    // 在渲染期间，对渲染上下文的每个属性访问都会调用此getter，它是一个主要的热点。
+    // 其中最昂贵的部分是多个hasOwn（）调用。
+    // 在普通对象上执行简单的属性访问要快得多，
+    // 因此我们使用accessCache对象（带有null原型）来记忆key对应的访问类型。
     let normalizedProps
     if (key[0] !== '$') {
+      // 渲染代理的属性访问缓存中
       const n = accessCache![key]
       if (n !== undefined) {
+        // 从缓存中取
         switch (n) {
           case AccessTypes.SETUP:
             return setupState[key]
@@ -245,9 +250,11 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
           // default: just fallthrough
         }
       } else if (setupState !== EMPTY_OBJ && hasOwn(setupState, key)) {
+        // 从 setupState 中取数据
         accessCache![key] = AccessTypes.SETUP
         return setupState[key]
       } else if (data !== EMPTY_OBJ && hasOwn(data, key)) {
+         // 从 data 中取数据
         accessCache![key] = AccessTypes.DATA
         return data[key]
       } else if (
@@ -256,12 +263,15 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
         (normalizedProps = instance.propsOptions[0]) &&
         hasOwn(normalizedProps, key)
       ) {
+        // 从 props 中取数据
         accessCache![key] = AccessTypes.PROPS
         return props![key]
       } else if (ctx !== EMPTY_OBJ && hasOwn(ctx, key)) {
+        // 从 ctx 中取数据
         accessCache![key] = AccessTypes.CONTEXT
         return ctx[key]
       } else if (!__FEATURE_OPTIONS_API__ || !isInBeforeCreate) {
+        // 都取不到
         accessCache![key] = AccessTypes.OTHER
       }
     }
@@ -269,6 +279,7 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
     const publicGetter = publicPropertiesMap[key]
     let cssModule, globalProperties
     // public $xxx properties
+     // 公开的 $xxx 属性或方法
     if (publicGetter) {
       if (key === '$attrs') {
         track(instance, TrackOpTypes.GET, key)
@@ -277,16 +288,19 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
       return publicGetter(instance)
     } else if (
       // css module (injected by vue-loader)
+      // css 模块，通过 vue-loader 编译的时候注入
       (cssModule = type.__cssModules) &&
       (cssModule = cssModule[key])
     ) {
       return cssModule
     } else if (ctx !== EMPTY_OBJ && hasOwn(ctx, key)) {
       // user may set custom properties to `this` that start with `$`
+      // 用户自定义的属性，也用 `$` 开头
       accessCache![key] = AccessTypes.CONTEXT
       return ctx[key]
     } else if (
       // global properties
+      // 全局定义的属性
       ((globalProperties = appContext.config.globalProperties),
       hasOwn(globalProperties, key))
     ) {
@@ -304,6 +318,7 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
         (key[0] === '$' || key[0] === '_') &&
         hasOwn(data, key)
       ) {
+        // 如果在 data 中定义的数据以 $ 开头，会报警告，因为 $ 是保留字符，不会做代理
         warn(
           `Property ${JSON.stringify(
             key
@@ -311,6 +326,7 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
             `character ("$" or "_") and is not proxied on the render context.`
         )
       } else {
+         // 在模板中使用的变量如果没有定义，报警告
         warn(
           `Property ${JSON.stringify(key)} was accessed during render ` +
             `but is not defined on instance.`
@@ -326,10 +342,13 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
   ): boolean {
     const { data, setupState, ctx } = instance
     if (setupState !== EMPTY_OBJ && hasOwn(setupState, key)) {
+      // 给 setupState 赋值
       setupState[key] = value
     } else if (data !== EMPTY_OBJ && hasOwn(data, key)) {
+      // 给 data 赋值
       data[key] = value
     } else if (key in instance.props) {
+      // 不能直接给 props 赋值
       __DEV__ &&
         warn(
           `Attempting to mutate prop "${key}". Props are readonly.`,
@@ -338,6 +357,7 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
       return false
     }
     if (key[0] === '$' && key.slice(1) in instance) {
+      // 不能给 Vue 内部以 $ 开头的保留属性赋值
       __DEV__ &&
         warn(
           `Attempting to mutate public property "${key}". ` +
@@ -353,6 +373,7 @@ export const PublicInstanceProxyHandlers: ProxyHandler<any> = {
           value
         })
       } else {
+        // 用户自定义数据赋值
         ctx[key] = value
       }
     }
@@ -400,6 +421,7 @@ export const RuntimeCompiledPublicInstanceProxyHandlers = extend(
       return PublicInstanceProxyHandlers.get!(target, key, target)
     },
     has(_: ComponentRenderContext, key: string) {
+       // 如果 key 以 _ 开头或者 key 在全局变量白名单内，则 has 为 false
       const has = key[0] !== '_' && !isGloballyWhitelisted(key)
       if (__DEV__ && !has && PublicInstanceProxyHandlers.has!(_, key)) {
         warn(

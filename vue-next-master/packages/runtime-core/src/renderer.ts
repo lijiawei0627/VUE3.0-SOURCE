@@ -438,9 +438,12 @@ function baseCreateRenderer(
     optimized = false
   ) => {
     // patching & not same type, unmount old tree
+    // 如果存在旧节点, 且新旧节点类型不同，则销毁旧节点
+     // n1 和 n2 节点的 type 和 key 都相同，才是相同节点
     if (n1 && !isSameVNodeType(n1, n2)) {
       anchor = getNextHostNode(n1)
       unmount(n1, parentComponent, parentSuspense, true)
+       // n1 设置为 null 保证后续都走 mount 逻辑
       n1 = null
     }
 
@@ -452,12 +455,15 @@ function baseCreateRenderer(
     const { type, ref, shapeFlag } = n2
     switch (type) {
       case Text:
+        // 处理文本节点
         processText(n1, n2, container, anchor)
         break
       case Comment:
+        // 处理注释节点
         processCommentNode(n1, n2, container, anchor)
         break
       case Static:
+        // 处理静态节点
         if (n1 == null) {
           mountStaticNode(n2, container, anchor, isSVG)
         } else if (__DEV__) {
@@ -465,6 +471,7 @@ function baseCreateRenderer(
         }
         break
       case Fragment:
+        // 处理 Fragment 元素
         processFragment(
           n1,
           n2,
@@ -478,6 +485,7 @@ function baseCreateRenderer(
         break
       default:
         if (shapeFlag & ShapeFlags.ELEMENT) {
+          // 处理普通 DOM 元素
           processElement(
             n1,
             n2,
@@ -489,6 +497,7 @@ function baseCreateRenderer(
             optimized
           )
         } else if (shapeFlag & ShapeFlags.COMPONENT) {
+           // 处理组件
           processComponent(
             n1,
             n2,
@@ -500,6 +509,7 @@ function baseCreateRenderer(
             optimized
           )
         } else if (shapeFlag & ShapeFlags.TELEPORT) {
+           // 处理 TELEPORT
           ;(type as typeof TeleportImpl).process(
             n1 as TeleportVNode,
             n2 as TeleportVNode,
@@ -512,6 +522,7 @@ function baseCreateRenderer(
             internals
           )
         } else if (__FEATURE_SUSPENSE__ && shapeFlag & ShapeFlags.SUSPENSE) {
+           // 处理 SUSPENSE
           ;(type as typeof SuspenseImpl).process(
             n1,
             n2,
@@ -653,6 +664,7 @@ function baseCreateRenderer(
   ) => {
     isSVG = isSVG || (n2.type as string) === 'svg'
     if (n1 == null) {
+      //挂载元素节点
       mountElement(
         n2,
         container,
@@ -663,6 +675,7 @@ function baseCreateRenderer(
         optimized
       )
     } else {
+      //更新元素节点
       patchElement(n1, n2, parentComponent, parentSuspense, isSVG, optimized)
     }
   }
@@ -699,6 +712,7 @@ function baseCreateRenderer(
       // only do this in production since cloned trees cannot be HMR updated.
       el = vnode.el = hostCloneNode(vnode.el)
     } else {
+      // 创建 DOM 元素节点
       el = vnode.el = hostCreateElement(
         vnode.type as string,
         isSVG,
@@ -708,8 +722,10 @@ function baseCreateRenderer(
       // mount children first, since some props may rely on child content
       // being already rendered, e.g. `<select value>`
       if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
+        // 处理子节点是纯文本的情况
         hostSetElementText(el, vnode.children as string)
       } else if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
+        // 处理子节点是数组的情况
         mountChildren(
           vnode.children as VNodeArrayChildren,
           el,
@@ -726,6 +742,7 @@ function baseCreateRenderer(
       }
       // props
       if (props) {
+        // 处理 props，比如 class、style、event 等属性
         for (const key in props) {
           if (!isReservedProp(key)) {
             hostPatchProp(
@@ -770,6 +787,7 @@ function baseCreateRenderer(
     if (needCallTransitionHooks) {
       transition!.beforeEnter(el)
     }
+    // 把创建的 DOM 元素节点挂载到 container 上
     hostInsert(el, container, anchor)
     if (
       (vnodeHook = props && props.onVnodeMounted) ||
@@ -827,9 +845,11 @@ function baseCreateRenderer(
     start = 0
   ) => {
     for (let i = start; i < children.length; i++) {
+      // 预处理 child
       const child = (children[i] = optimized
         ? cloneIfMounted(children[i] as VNode)
         : normalizeVNode(children[i]))
+      // 递归 patch 挂载 child
       patch(
         null,
         child,
@@ -881,6 +901,7 @@ function baseCreateRenderer(
       // (i.e. at the exact same position in the source template)
       if (patchFlag & PatchFlags.FULL_PROPS) {
         // element props contain dynamic keys, full diff needed
+        // 更新 props
         patchProps(
           el,
           n2,
@@ -973,6 +994,7 @@ function baseCreateRenderer(
       }
     } else if (!optimized) {
       // full diff
+      // 更新子节点
       patchChildren(
         n1,
         n2,
@@ -1181,6 +1203,7 @@ function baseCreateRenderer(
           optimized
         )
       } else {
+        // 挂载组件
         mountComponent(
           n2,
           container,
@@ -1192,6 +1215,7 @@ function baseCreateRenderer(
         )
       }
     } else {
+      // 更新组件
       updateComponent(n1, n2, optimized)
     }
   }
@@ -1205,6 +1229,7 @@ function baseCreateRenderer(
     isSVG,
     optimized
   ) => {
+    // 创建组件实例
     const instance: ComponentInternalInstance = (initialVNode.component = createComponentInstance(
       initialVNode,
       parentComponent,
@@ -1229,6 +1254,7 @@ function baseCreateRenderer(
     if (__DEV__) {
       startMeasure(instance, `init`)
     }
+    // 设置组件实例
     setupComponent(instance)
     if (__DEV__) {
       endMeasure(instance, `init`)
@@ -1251,7 +1277,8 @@ function baseCreateRenderer(
       }
       return
     }
-
+ 
+    // 设置并运行带副作用的渲染函数
     setupRenderEffect(
       instance,
       initialVNode,
@@ -1270,6 +1297,7 @@ function baseCreateRenderer(
 
   const updateComponent = (n1: VNode, n2: VNode, optimized: boolean) => {
     const instance = (n2.component = n1.component)!
+    // 根据新旧子组件 vnode 判断是否需要更新子组件
     if (shouldUpdateComponent(n1, n2, optimized)) {
       if (
         __FEATURE_SUSPENSE__ &&
@@ -1288,15 +1316,19 @@ function baseCreateRenderer(
         return
       } else {
         // normal update
+        // 新的子组件 vnode 赋值给 instance.next
         instance.next = n2
         // in case the child component is also queued, remove it to avoid
         // double updating the same child component in the same flush.
+        // 子组件也可能因为数据变化被添加到更新队列里了，移除它们防止对一个子组件重复更新
         invalidateJob(instance.update)
         // instance.update is the reactive effect runner.
+        // 执行子组件的副作用渲染函数
         instance.update()
       }
     } else {
       // no update needed. just copy over properties
+      // 不需要更新，只复制属性
       n2.component = n1.component
       n2.el = n1.el
       instance.vnode = n2
@@ -1313,6 +1345,7 @@ function baseCreateRenderer(
     optimized
   ) => {
     // create reactive effect for rendering
+    // 创建响应式的副作用渲染函数
     instance.update = effect(function componentEffect() {
       if (!instance.isMounted) {
         let vnodeHook: VNodeHook | null | undefined
@@ -1332,6 +1365,7 @@ function baseCreateRenderer(
         if (__DEV__) {
           startMeasure(instance, `render`)
         }
+         // 渲染组件生成子树 vnode
         const subTree = (instance.subTree = renderComponentRoot(instance))
         if (__DEV__) {
           endMeasure(instance, `render`)
@@ -1355,6 +1389,7 @@ function baseCreateRenderer(
           if (__DEV__) {
             startMeasure(instance, `patch`)
           }
+          // 把子树 vnode 挂载到 container 中
           patch(
             null,
             subTree,
@@ -1367,6 +1402,7 @@ function baseCreateRenderer(
           if (__DEV__) {
             endMeasure(instance, `patch`)
           }
+          // 保留渲染生成的子树根 DOM 节点
           initialVNode.el = subTree.el
         }
         // mounted hook
@@ -1394,7 +1430,9 @@ function baseCreateRenderer(
         // updateComponent
         // This is triggered by mutation of component's own state (next: null)
         // OR parent calling processComponent (next: VNode)
+        // 更新组件
         let { next, bu, u, parent, vnode } = instance
+         // next 表示新的组件 vnode
         let originNext = next
         let vnodeHook: VNodeHook | null | undefined
         if (__DEV__) {
@@ -1402,6 +1440,7 @@ function baseCreateRenderer(
         }
 
         if (next) {
+          // 更新组件 vnode 节点信息
           updateComponentPreRender(instance, next, optimized)
         } else {
           next = vnode
@@ -1421,11 +1460,14 @@ function baseCreateRenderer(
         if (__DEV__) {
           startMeasure(instance, `render`)
         }
+        // 渲染新的子树 vnode
         const nextTree = renderComponentRoot(instance)
         if (__DEV__) {
           endMeasure(instance, `render`)
         }
+        // 缓存旧的子树 vnode
         const prevTree = instance.subTree
+        // 更新子树 vnode
         instance.subTree = nextTree
 
         // reset refs
@@ -1436,12 +1478,15 @@ function baseCreateRenderer(
         if (__DEV__) {
           startMeasure(instance, `patch`)
         }
+        // 组件更新核心逻辑，根据新旧子树 vnode 做 patch
         patch(
           prevTree,
           nextTree,
           // parent may have changed if it's in a teleport
+          // 如果在 teleport 组件中父节点可能已经改变，所以容器直接找旧树 DOM 元素的父节点
           hostParentNode(prevTree.el!)!,
           // anchor may have changed if it's in a fragment
+          // 参考节点在 fragment 的情况可能改变，所以直接找旧树 DOM 元素的下一个节点
           getNextHostNode(prevTree),
           instance,
           parentSuspense,
@@ -1450,6 +1495,7 @@ function baseCreateRenderer(
         if (__DEV__) {
           endMeasure(instance, `patch`)
         }
+         // 缓存更新后的 DOM 节点
         next.el = nextTree.el
         if (originNext === null) {
           // self-triggered update. In case of HOC, update parent component
@@ -1486,15 +1532,22 @@ function baseCreateRenderer(
     nextVNode: VNode,
     optimized: boolean
   ) => {
+    // 新组件 vnode 的 component 属性指向组件实例
     nextVNode.component = instance
+    // 旧组件 vnode 的 props 属性
     const prevProps = instance.vnode.props
+    // 组件实例的 vnode 属性指向新的组件 vnode
     instance.vnode = nextVNode
+    // 清空 next 属性，为了下一次重新渲染准备
     instance.next = null
+    // 更新 props
     updateProps(instance, nextVNode.props, prevProps, optimized)
+    // 更新 插槽
     updateSlots(instance, nextVNode.children)
 
     // props update may have triggered pre-flush watchers.
     // flush them before the render update.
+    // 避免props更新导致的重复渲染
     flushPreFlushCbs(undefined, instance.update)
   }
 
@@ -1546,19 +1599,23 @@ function baseCreateRenderer(
     }
 
     // children has 3 possibilities: text, array or no children.
+    // 子节点有 3 种可能情况：文本、数组、空
     if (shapeFlag & ShapeFlags.TEXT_CHILDREN) {
-      // text children fast path
+      // 数组 -> 文本，则删除之前的子节点
       if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
         unmountChildren(c1 as VNode[], parentComponent, parentSuspense)
       }
       if (c2 !== c1) {
+        // 文本对比不同，则替换为新文本
         hostSetElementText(container, c2 as string)
       }
     } else {
       if (prevShapeFlag & ShapeFlags.ARRAY_CHILDREN) {
         // prev children was array
+        // 之前的子节点是数组
         if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
           // two arrays, cannot assume anything, do full diff
+          // 新的子节点仍然是数组，则做完整地 diff
           patchKeyedChildren(
             c1 as VNode[],
             c2 as VNodeArrayChildren,
@@ -1571,15 +1628,20 @@ function baseCreateRenderer(
           )
         } else {
           // no new children, just unmount old
+          // 数组 -> 空，则仅仅删除之前的子节点
           unmountChildren(c1 as VNode[], parentComponent, parentSuspense, true)
         }
       } else {
         // prev children was text OR null
         // new children is array OR null
+        // 之前的子节点是文本节点或者为空
+        // 新的子节点是数组或者为空
         if (prevShapeFlag & ShapeFlags.TEXT_CHILDREN) {
+          // 如果之前子节点是文本，则把它清空
           hostSetElementText(container, '')
         }
         // mount new if array
+        // 如果新的子节点是数组，则挂载新子节点
         if (shapeFlag & ShapeFlags.ARRAY_CHILDREN) {
           mountChildren(
             c2 as VNodeArrayChildren,
@@ -1644,6 +1706,14 @@ function baseCreateRenderer(
     }
   }
 
+  // 1. 从头部开始同步
+  // 2. 从尾部开始同步
+  // 3. 挂载剩余的新节点
+  // 4. 删除多余节点
+  // 5. 处理未知子序列
+  // 5.1 根据 key:index 建立新子序列的索引图
+  // 5.2 正序遍历旧子序列，找到匹配的节点更新，删除不在新子序列中的节点，判断是否有移动节点
+  // 5.3 移动和挂载新节点
   // can be all-keyed or mixed
   const patchKeyedChildren = (
     c1: VNode[],
@@ -1657,10 +1727,12 @@ function baseCreateRenderer(
   ) => {
     let i = 0
     const l2 = c2.length
+    // 旧子节点的尾部索引
     let e1 = c1.length - 1 // prev ending index
+    // 新子节点的尾部索引
     let e2 = l2 - 1 // next ending index
-
     // 1. sync from start
+    // 1. 从头部开始同步
     // (a b) c
     // (a b) d e
     while (i <= e1 && i <= e2) {
@@ -1669,6 +1741,7 @@ function baseCreateRenderer(
         ? cloneIfMounted(c2[i] as VNode)
         : normalizeVNode(c2[i]))
       if (isSameVNodeType(n1, n2)) {
+        // 相同的节点，递归执行 patch 更新节点
         patch(
           n1,
           n2,
@@ -1686,6 +1759,7 @@ function baseCreateRenderer(
     }
 
     // 2. sync from end
+    // 2. 从尾部开始同步
     // a (b c)
     // d e (b c)
     while (i <= e1 && i <= e2) {
@@ -1712,6 +1786,7 @@ function baseCreateRenderer(
     }
 
     // 3. common sequence + mount
+    // 3. 挂载剩余的新节点
     // (a b)
     // (a b) c
     // i = 2, e1 = 1, e2 = 2
@@ -1740,6 +1815,7 @@ function baseCreateRenderer(
     }
 
     // 4. common sequence + unmount
+    // 4. 删除多余节点
     // (a b) c
     // (a b)
     // i = 2, e1 = 2, e2 = 1
@@ -1754,6 +1830,7 @@ function baseCreateRenderer(
     }
 
     // 5. unknown sequence
+    // 5. 处理未知子序列
     // [i ... e1 + 1]: a b [c d e] f g
     // [i ... e2 + 1]: a b [e d c h] f g
     // i = 2, e1 = 4, e2 = 5
@@ -1762,6 +1839,7 @@ function baseCreateRenderer(
       const s2 = i // next starting index
 
       // 5.1 build key:index map for newChildren
+      // 5.1 根据 key:index 建立新子序列的索引图
       const keyToNewIndexMap: Map<string | number, number> = new Map()
       for (i = s2; i <= e2; i++) {
         const nextChild = (c2[i] = optimized
@@ -1781,27 +1859,38 @@ function baseCreateRenderer(
 
       // 5.2 loop through old children left to be patched and try to patch
       // matching nodes & remove nodes that are no longer present
+      // 5.2 正序遍历旧子序列，找到匹配的节点更新，删除不在新子序列中的节点，判断是否有移动节点
+      // 新子序列已更新节点的数量
       let j
       let patched = 0
+      // 新子序列待更新节点的数量，等于新子序列的长度
       const toBePatched = e2 - s2 + 1
+      // 是否存在要移动的节点
       let moved = false
       // used to track whether any node has moved
+      // 用于跟踪判断是否有节点移动
       let maxNewIndexSoFar = 0
       // works as Map<newIndex, oldIndex>
       // Note that oldIndex is offset by +1
       // and oldIndex = 0 is a special value indicating the new node has
       // no corresponding old node.
       // used for determining longest stable subsequence
+      // 这个数组存储新子序列中的元素在旧子序列节点的索引，用于确定最长递增子序列
       const newIndexToOldIndexMap = new Array(toBePatched)
+      // 初始化数组，每个元素的值都是 0
+      // 0 是一个特殊的值，如果遍历完了仍有元素的值为 0，则说明这个新节点没有对应的旧节点
       for (i = 0; i < toBePatched; i++) newIndexToOldIndexMap[i] = 0
-
+      // 正序遍历旧子序列
       for (i = s1; i <= e1; i++) {
+        // 拿到每一个旧子序列节点
         const prevChild = c1[i]
+        // 所有新的子序列节点都已经更新，剩余的节点删除
         if (patched >= toBePatched) {
           // all new children have been patched so this can only be a removal
           unmount(prevChild, parentComponent, parentSuspense, true)
           continue
         }
+        // 查找旧子序列中的节点在新子序列中的索引
         let newIndex
         if (prevChild.key != null) {
           newIndex = keyToNewIndexMap.get(prevChild.key)
@@ -1818,14 +1907,19 @@ function baseCreateRenderer(
           }
         }
         if (newIndex === undefined) {
+          // 找不到说明旧子序列已经不存在于新子序列中，则删除该节点
           unmount(prevChild, parentComponent, parentSuspense, true)
         } else {
+           // 更新新子序列中的元素在旧子序列中的索引，这里加 1 偏移，
+          //  是为了避免 i 为 0 的特殊情况，影响对后续最长递增子序列的求解
           newIndexToOldIndexMap[newIndex - s2] = i + 1
+          // maxNewIndexSoFar 始终存储的是上次求值的 newIndex，如果不是一直递增，则说明有移动
           if (newIndex >= maxNewIndexSoFar) {
             maxNewIndexSoFar = newIndex
           } else {
             moved = true
           }
+          // 更新新旧子序列中匹配的节点
           patch(
             prevChild,
             c2[newIndex] as VNode,
@@ -1842,18 +1936,23 @@ function baseCreateRenderer(
 
       // 5.3 move and mount
       // generate longest stable subsequence only when nodes have moved
+      // 5.3 移动和挂载新节点
+      // 仅当节点移动时生成最长递增子序列
       const increasingNewIndexSequence = moved
         ? getSequence(newIndexToOldIndexMap)
         : EMPTY_ARR
       j = increasingNewIndexSequence.length - 1
       // looping backwards so that we can use last patched node as anchor
+      // 倒序遍历以便我们可以使用最后更新的节点作为锚点
       for (i = toBePatched - 1; i >= 0; i--) {
         const nextIndex = s2 + i
         const nextChild = c2[nextIndex] as VNode
+        // 锚点指向上一个更新的节点，如果 nextIndex 超过新子节点的长度，则指向 parentAnchor
         const anchor =
           nextIndex + 1 < l2 ? (c2[nextIndex + 1] as VNode).el : parentAnchor
         if (newIndexToOldIndexMap[i] === 0) {
           // mount new
+          // 挂载新的子节点
           patch(
             null,
             nextChild,
@@ -1867,9 +1966,11 @@ function baseCreateRenderer(
           // move if:
           // There is no stable subsequence (e.g. a reverse)
           // OR current node is not among the stable sequence
+          // 没有最长递增子序列（reverse 的场景）或者当前的节点索引不在最长递增子序列中，需要移动
           if (j < 0 || i !== increasingNewIndexSequence[j]) {
             move(nextChild, container, anchor, MoveType.REORDER)
           } else {
+            // 倒序递增子序列
             j--
           }
         }
@@ -2173,15 +2274,19 @@ function baseCreateRenderer(
     }
   }
 
+  // 组件渲染
   const render: RootRenderFunction = (vnode, container) => {
     if (vnode == null) {
       if (container._vnode) {
+        // 销毁组件
         unmount(container._vnode, null, null, true)
       }
     } else {
+      // 创建或者更新组件
       patch(container._vnode || null, vnode, container)
     }
     flushPostFlushCbs()
+    // 缓存 vnode 节点，表示已经渲染
     container._vnode = vnode
   }
 
@@ -2237,12 +2342,14 @@ function getSequence(arr: number[]): number[] {
     if (arrI !== 0) {
       j = result[result.length - 1]
       if (arr[j] < arrI) {
+        // 存储在 result 更新前的最后一个索引的值
         p[i] = j
         result.push(i)
         continue
       }
       u = 0
       v = result.length - 1
+      // 二分搜索，查找比 arrI 小的节点，更新 result 的值
       while (u < v) {
         c = ((u + v) / 2) | 0
         if (arr[result[c]] < arrI) {
@@ -2261,6 +2368,7 @@ function getSequence(arr: number[]): number[] {
   }
   u = result.length
   v = result[u - 1]
+  // 回溯数组 p，找到最终的索引
   while (u-- > 0) {
     result[u] = v
     v = p[v]

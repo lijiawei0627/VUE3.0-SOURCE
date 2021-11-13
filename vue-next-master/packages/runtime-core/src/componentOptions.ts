@@ -372,9 +372,11 @@ export function applyOptions(
 ) {
   const {
     // composition
+    // 组合
     mixins,
     extends: extendsOptions,
     // state
+    // 状态
     data: dataOptions,
     computed: computedOptions,
     methods,
@@ -382,9 +384,11 @@ export function applyOptions(
     provide: provideOptions,
     inject: injectOptions,
     // assets
+     // 组件和指令
     components,
     directives,
     // lifecycle
+    // 生命周期
     beforeMount,
     mounted,
     beforeUpdate,
@@ -399,6 +403,7 @@ export function applyOptions(
     errorCaptured
   } = options
 
+  // instance.proxy 作为 this
   const publicThis = instance.proxy!
   const ctx = instance.ctx
   const globalMixins = instance.appContext.mixins
@@ -408,6 +413,7 @@ export function applyOptions(
   }
 
   // applyOptions is called non-as-mixin once per instance
+   // 处理全局 mixin
   if (!asMixin) {
     isInBeforeCreate = true
     callSyncHook('beforeCreate', options, publicThis, globalMixins)
@@ -417,10 +423,12 @@ export function applyOptions(
   }
 
   // extending a base component...
+  // 处理 extend
   if (extendsOptions) {
     applyOptions(instance, extendsOptions, deferredData, deferredWatch, true)
   }
   // local mixins
+  // 处理本地 mixins
   if (mixins) {
     applyMixins(instance, mixins, deferredData, deferredWatch)
   }
