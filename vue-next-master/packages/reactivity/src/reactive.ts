@@ -34,7 +34,7 @@ const enum TargetType {
   COMMON = 1,
   COLLECTION = 2
 }
-
+// target type 映射关系
 function targetTypeMap(rawType: string) {
   switch (rawType) {
     case 'Object':
@@ -49,7 +49,7 @@ function targetTypeMap(rawType: string) {
       return TargetType.INVALID
   }
 }
-
+// 获取target type
 function getTargetType(value: Target) {
   return value[ReactiveFlags.SKIP] || !Object.isExtensible(value)
     ? TargetType.INVALID
@@ -62,9 +62,11 @@ type UnwrapNestedRefs<T> = T extends Ref ? T : UnwrapRef<T>
 export function reactive<T extends object>(target: T): UnwrapNestedRefs<T>
 export function reactive(target: object) {
   // if trying to observe a readonly proxy, return the readonly version.
+  // 如果尝试把一个 readonly proxy 变成响应式，直接返回这个 readonly proxy
   if (target && (target as Target)[ReactiveFlags.IS_READONLY]) {
     return target
   }
+  // 创建一个响应式对象
   return createReactiveObject(
     target,
     false,
@@ -139,6 +141,7 @@ function createReactiveObject(
   baseHandlers: ProxyHandler<any>,
   collectionHandlers: ProxyHandler<any>
 ) {
+  // 目标必须是对象或数组类型
   if (!isObject(target)) {
     if (__DEV__) {
       console.warn(`value cannot be made reactive: ${String(target)}`)
@@ -151,23 +154,30 @@ function createReactiveObject(
     target[ReactiveFlags.RAW] &&
     !(isReadonly && target[ReactiveFlags.IS_REACTIVE])
   ) {
+    // target 已经是 Proxy 对象，直接返回
+    // 有个例外，如果是 readonly 作用于一个响应式对象，则继续
     return target
   }
   // target already has corresponding Proxy
+  // target 已经有对应的 Proxy 了，则直接返回
   const proxyMap = isReadonly ? readonlyMap : reactiveMap
   const existingProxy = proxyMap.get(target)
   if (existingProxy) {
     return existingProxy
   }
   // only a whitelist of value types can be observed.
+  // 只有在白名单里的数据类型才能变成响应式
   const targetType = getTargetType(target)
   if (targetType === TargetType.INVALID) {
     return target
   }
+   // 利用 Proxy 创建响应式
   const proxy = new Proxy(
     target,
     targetType === TargetType.COLLECTION ? collectionHandlers : baseHandlers
   )
+  // 将target对应的proxy绑定到proxyMap（readonlyMap or reactiveMap）上
+  // 以便于下次判断target是否已有对应的响应式对象
   proxyMap.set(target, proxy)
   return proxy
 }

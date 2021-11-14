@@ -34,14 +34,18 @@ const shallowReadonlyGet = /*#__PURE__*/ createGetter(true, true)
 const arrayInstrumentations: Record<string, Function> = {}
 ;['includes', 'indexOf', 'lastIndexOf'].forEach(key => {
   arrayInstrumentations[key] = function(...args: any[]): any {
+    // toRaw 可以把响应式对象转成原始数据
     const arr = toRaw(this) as any
     for (let i = 0, l = (this as any).length; i < l; i++) {
+      // 依赖收集
       track(arr, TrackOpTypes.GET, i + '')
     }
     // we run the method using the original args first (which may be reactive)
+    // 先尝试用参数本身，可能是响应式数据
     const res = arr[key](...args)
     if (res === -1 || res === false) {
       // if that didn't work, run it again using raw values.
+      // 如果失败，再尝试把参数转成原始数据
       return arr[key](...args.map(toRaw))
     } else {
       return res
@@ -52,17 +56,21 @@ const arrayInstrumentations: Record<string, Function> = {}
 function createGetter(isReadonly = false, shallow = false) {
   return function get(target: Target, key: string | symbol, receiver: object) {
     if (key === ReactiveFlags.IS_REACTIVE) {
+      // 代理 observed.__v_isReactive
       return !isReadonly
     } else if (key === ReactiveFlags.IS_READONLY) {
+      // 代理 observed.__v_isReadonly
       return isReadonly
     } else if (
       key === ReactiveFlags.RAW &&
       receiver === (isReadonly ? readonlyMap : reactiveMap).get(target)
     ) {
+      // 代理 observed.__v_raw
       return target
     }
 
     const targetIsArray = isArray(target)
+    // arrayInstrumentations 包含对数组一些方法修改的函数
     if (targetIsArray && hasOwn(arrayInstrumentations, key)) {
       return Reflect.get(arrayInstrumentations, key, receiver)
     }
@@ -70,6 +78,7 @@ function createGetter(isReadonly = false, shallow = false) {
     const res = Reflect.get(target, key, receiver)
 
     const keyIsSymbol = isSymbol(key)
+    // 内置 Symbol key 不需要依赖收集
     if (
       keyIsSymbol
         ? builtInSymbols.has(key as symbol)
@@ -77,7 +86,8 @@ function createGetter(isReadonly = false, shallow = false) {
     ) {
       return res
     }
-
+    // 依赖收集
+    // isReadonly 为 true 则不需要依赖收集
     if (!isReadonly) {
       track(target, TrackOpTypes.GET, key)
     }
@@ -87,7 +97,7 @@ function createGetter(isReadonly = false, shallow = false) {
     }
 
     if (isRef(res)) {
-      // ref unwrapping - does not apply for Array + integer key.
+      // ref展开-不适用于数组+整数键。
       const shouldUnwrap = !targetIsArray || !isIntegerKey(key)
       return shouldUnwrap ? res.value : res
     }
@@ -96,6 +106,10 @@ function createGetter(isReadonly = false, shallow = false) {
       // Convert returned value into a proxy as well. we do the isObject check
       // here to avoid invalid value warning. Also need to lazy access readonly
       // and reactive here to avoid circular dependency.
+      // 将返回值也转换为代理。我们在这里执行isObject检查以避免无效值警告。
+      // 这里还需要延迟访问只读和被动，以避免循环依赖。（把递归放到get的时候才执行）
+      // 如果 res 是个对象或者数组类型，isReadonly为false，则递归执行 reactive 函数把 res 变成响应式
+      // isReadonly为true，则递归执行 readonly 函数把 res readonly
       return isReadonly ? readonly(res) : reactive(res)
     }
 
@@ -124,16 +138,21 @@ function createSetter(shallow = false) {
       // in shallow mode, objects are set as-is regardless of reactive or not
     }
 
+    // 获取key是否存在target上
     const hadKey =
       isArray(target) && isIntegerKey(key)
         ? Number(key) < target.length
         : hasOwn(target, key)
     const result = Reflect.set(target, key, value, receiver)
     // don't trigger if target is something up in the prototype chain of original
+    // 如果目标的原型链也是一个 proxy，通过 Reflect.set 修改原型链上的属性会再次触发 setter，
+    // 这种情况下就没必要触发两次 trigger 了
     if (target === toRaw(receiver)) {
       if (!hadKey) {
+        // key不存在target上，所以新增
         trigger(target, TriggerOpTypes.ADD, key, value)
       } else if (hasChanged(value, oldValue)) {
+        // key存在target上，所以修改
         trigger(target, TriggerOpTypes.SET, key, value, oldValue)
       }
     }
@@ -164,6 +183,7 @@ function ownKeys(target: object): (string | number | symbol)[] {
   return Reflect.ownKeys(target)
 }
 
+// Proxy 处理器对象 
 export const mutableHandlers: ProxyHandler<object> = {
   get,
   set,

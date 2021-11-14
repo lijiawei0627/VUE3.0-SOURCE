@@ -50,10 +50,13 @@ class RefImpl<T> {
   public readonly __v_isRef = true
 
   constructor(private _rawValue: T, private readonly _shallow = false) {
+    // 如果是对象或者数组类型，则转换一个 reactive 对象。
     this._value = _shallow ? _rawValue : convert(_rawValue)
   }
 
   get value() {
+    // getter
+    // 依赖收集，key 为固定的 value
     track(toRaw(this), TrackOpTypes.GET, 'value')
     return this._value
   }
@@ -69,6 +72,7 @@ class RefImpl<T> {
 
 function createRef(rawValue: unknown, shallow = false) {
   if (isRef(rawValue)) {
+    // 如果传入的就是一个 ref，那么返回自身即可，处理嵌套 ref 的情况。
     return rawValue
   }
   return new RefImpl(rawValue, shallow)
