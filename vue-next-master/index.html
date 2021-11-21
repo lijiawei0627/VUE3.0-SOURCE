@@ -10,30 +10,42 @@
 <body>
   <div id="app">
     <button @click="click">
-      {{ state.message }}
+      {{ plusOne }}
     </button>
   </div>
   <script>
     const { 
       createApp,
       reactive,
-      computed
+      computed,
+      ref,
+      watchEffect
     } = Vue
 
     const vm = createApp({
       setup(props) {
-        const state = reactive({
-          message: "hello world!!",
-          arr: [1, 2]
+        const count = ref(0) 
+        const plusOne = computed(() => { 
+          return count.value + 1 
         })
-
-        function click() {
-          state.message = state.message.split("").reverse().join("")
-          console.log(state.arr.includes(1))
+        watchEffect(() => { 
+          console.log(plusOne.value + count.value) 
+        }) 
+        function click() { 
+          count.value++ 
         }
+        // const state = reactive({
+        //   message: "hello world!!",
+        //   arr: [1, 2]
+        // })
+
+        // function click() {
+        //   state.message = state.message.split("").reverse().join("")
+        //   console.log(state.arr.includes(1))
+        // }
 
         return {
-          state,
+          plusOne,
           click
         }
       }

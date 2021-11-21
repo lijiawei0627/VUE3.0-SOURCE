@@ -26,7 +26,9 @@ export interface SchedulerJob {
 export type SchedulerCb = Function & { id?: number }
 export type SchedulerCbs = SchedulerCb | SchedulerCb[]
 
+// 异步任务队列是否正在执行 
 let isFlushing = false
+// 异步任务队列是否等待执行 
 let isFlushPending = false
 
 const queue: (SchedulerJob | null)[] = []
@@ -74,6 +76,10 @@ export function queueJob(job: SchedulerJob) {
 }
 
 function queueFlush() {
+  // 异步任务队列是否正在执行 
+  // let isFlushing = false 
+  // 异步任务队列是否等待执行 
+  // let isFlushPending = false 
   if (!isFlushing && !isFlushPending) {
     isFlushPending = true
     currentFlushPromise = resolvedPromise.then(flushJobs)
@@ -89,7 +95,9 @@ export function invalidateJob(job: SchedulerJob) {
 
 function queueCb(
   cb: SchedulerCbs,
+  // 异步任务队列 
   activeQueue: SchedulerCb[] | null,
+  // 队列任务执行完后执行的回调函数队列 
   pendingQueue: SchedulerCb[],
   index: number
 ) {
@@ -107,6 +115,7 @@ function queueCb(
     // if cb is an array, it is a component lifecycle hook which can only be
     // triggered by a job, which is already deduped in the main queue, so
     // we can skip duplicate check here to improve perf
+    // 如果是数组，把它拍平成一维 
     pendingQueue.push(...cb)
   }
   queueFlush()
@@ -173,6 +182,7 @@ export function flushPostFlushCbs(seen?: CountMap) {
       postFlushIndex++
     ) {
       if (__DEV__) {
+        // 用来在非生产环境下检测是否有循环更新的
         checkRecursiveUpdates(seen!, activePostFlushCbs[postFlushIndex])
       }
       activePostFlushCbs[postFlushIndex]()
@@ -186,6 +196,7 @@ const getId = (job: SchedulerJob | SchedulerCb) =>
   job.id == null ? Infinity : job.id
 
 function flushJobs(seen?: CountMap) {
+  // 正在执行异步任务队列
   isFlushPending = false
   isFlushing = true
   if (__DEV__) {
@@ -203,6 +214,8 @@ function flushJobs(seen?: CountMap) {
   //    its update can be skipped.
   // Jobs can never be null before flush starts, since they are only invalidated
   // during execution of another flushed job.
+  // 组件的更新是先父后子 
+  // 如果一个组件在父组件更新过程中卸载，它自身的更新应该被跳过 
   queue.sort((a, b) => getId(a!) - getId(b!))
 
   try {
@@ -225,6 +238,7 @@ function flushJobs(seen?: CountMap) {
     currentFlushPromise = null
     // some postFlushCb queued jobs!
     // keep flushing until it drains.
+    // 一些 postFlushCb 执行过程中会再次添加异步任务，递归 flushJobs 会把它们都执行完毕 
     if (queue.length || pendingPostFlushCbs.length) {
       flushJobs(seen)
     }

@@ -22,6 +22,7 @@ export interface WritableComputedOptions<T> {
 
 class ComputedRefImpl<T> {
   private _value!: T
+  // 数据是否脏的 
   private _dirty = true
 
   public readonly effect: ReactiveEffect<T>
@@ -34,11 +35,15 @@ class ComputedRefImpl<T> {
     private readonly _setter: ComputedSetter<T>,
     isReadonly: boolean
   ) {
+    // 创建副作用函数 
     this.effect = effect(getter, {
+      // 延时执行 
       lazy: true,
+      // 调度执行的实现 
       scheduler: () => {
         if (!this._dirty) {
           this._dirty = true
+          // 派发通知，通知运行访问该计算属性的 activeEffect 
           trigger(toRaw(this), TriggerOpTypes.SET, 'value')
         }
       }
@@ -48,15 +53,19 @@ class ComputedRefImpl<T> {
   }
 
   get value() {
+    // 计算属性的 getter 
     if (this._dirty) {
+      // 只有数据为脏的时候才会重新计算 
       this._value = this.effect()
       this._dirty = false
     }
+    // 依赖收集，收集运行访问该计算属性的 activeEffect 
     track(toRaw(this), TrackOpTypes.GET, 'value')
     return this._value
   }
 
   set value(newValue: T) {
+    // 计算属性的 setter 
     this._setter(newValue)
   }
 }
@@ -68,11 +77,14 @@ export function computed<T>(
 export function computed<T>(
   getterOrOptions: ComputedGetter<T> | WritableComputedOptions<T>
 ) {
+  // getter 函数 
   let getter: ComputedGetter<T>
+  // setter 函数 
   let setter: ComputedSetter<T>
-
+  // 标准化参数 
   if (isFunction(getterOrOptions)) {
     getter = getterOrOptions
+    // 表面传入的是 getter 函数，不能修改计算属性的值 
     setter = __DEV__
       ? () => {
           console.warn('Write operation failed: computed value is readonly')

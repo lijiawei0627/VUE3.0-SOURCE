@@ -132,6 +132,7 @@ function doWatch(
   source: WatchSource | WatchSource[] | WatchEffect,
   cb: WatchCallback | null,
   { immediate, deep, flush, onTrack, onTrigger }: WatchOptions = EMPTY_OBJ,
+  // 当前组件实例 
   instance = currentInstance
 ): WatchStopHandle {
   if (__DEV__ && !cb) {
@@ -149,6 +150,7 @@ function doWatch(
     }
   }
 
+  // source 不合法的时候会报警告 
   const warnInvalidSource = (s: unknown) => {
     warn(
       `Invalid watch source: `,
@@ -158,14 +160,18 @@ function doWatch(
     )
   }
 
+  // 标准化source，创建getter
   let getter: () => any
   const isRefSource = isRef(source)
   if (isRefSource) {
+    // ref source
     getter = () => (source as Ref).value
   } else if (isReactive(source)) {
+    // reactive source
     getter = () => source
     deep = true
   } else if (isArray(source)) {
+    // 数组 source
     getter = () =>
       source.map(s => {
         if (isRef(s)) {
@@ -178,13 +184,14 @@ function doWatch(
           __DEV__ && warnInvalidSource(s)
         }
       })
-  } else if (isFunction(source)) {
+  } else if (isFunction(source)) {  // function source
     if (cb) {
       // getter with cb
       getter = () =>
         callWithErrorHandling(source, instance, ErrorCodes.WATCH_GETTER)
     } else {
       // no cb -> simple effect
+      // watchEffect 的逻辑
       getter = () => {
         if (instance && instance.isUnmounted) {
           return
@@ -211,6 +218,7 @@ function doWatch(
   }
 
   let cleanup: () => void
+  // 注册无效回调函数 
   const onInvalidate: InvalidateCbRegistrator = (fn: () => void) => {
     cleanup = runner.options.onStop = () => {
       callWithErrorHandling(fn, instance, ErrorCodes.WATCH_CLEANUP)
@@ -232,25 +240,32 @@ function doWatch(
     return NOOP
   }
 
+  // 旧值初始值 
   let oldValue = isArray(source) ? [] : INITIAL_WATCHER_VALUE
+  // 回调函数 
   const job: SchedulerJob = () => {
+    // runner effect未激活直接返回
     if (!runner.active) {
       return
     }
     if (cb) {
+      // 求得新值 
       // watch(source, cb)
       const newValue = runner()
       if (deep || isRefSource || hasChanged(newValue, oldValue)) {
         // cleanup before running cb again
+        // 执行清理函数 
         if (cleanup) {
           cleanup()
         }
         callWithAsyncErrorHandling(cb, instance, ErrorCodes.WATCH_CALLBACK, [
           newValue,
           // pass undefined as the old value when it's changed for the first time
+          // 第一次更改时传递旧值为 undefined 
           oldValue === INITIAL_WATCHER_VALUE ? undefined : oldValue,
           onInvalidate
         ])
+         // 更新旧值 
         oldValue = newValue
       }
     } else {
@@ -262,12 +277,14 @@ function doWatch(
   // important: mark the job as a watcher callback so that scheduler knows it
   // it is allowed to self-trigger (#1727)
   job.allowRecurse = !!cb
-
+  // 创建 scheduler 时序执行函数 
   let scheduler: (job: () => any) => void
   if (flush === 'sync') {
+    // 同步 
     scheduler = job
   } else if (flush === 'pre') {
     // ensure it's queued before component updates (which have positive ids)
+    // 进入异步队列，组件更新前执行 
     job.id = -1
     scheduler = () => {
       if (!instance || instance.isMounted) {
@@ -275,13 +292,15 @@ function doWatch(
       } else {
         // with 'pre' option, the first call must happen before
         // the component is mounted so it is called synchronously.
+        // 如果组件还没挂载，则同步执行确保在组件挂载前 
         job()
       }
     }
   } else {
+    // 进入异步队列，组件更新后执行 
     scheduler = () => queuePostRenderEffect(job, instance && instance.suspense)
   }
-
+  // 创建 effect 副作用函数 
   const runner = effect(getter, {
     lazy: true,
     onTrack,
@@ -289,22 +308,28 @@ function doWatch(
     scheduler
   })
 
+  // 在组件实例中记录这个 effect 
   recordInstanceBoundEffect(runner)
 
   // initial run
+  // 初次执行 
   if (cb) {
     if (immediate) {
       job()
     } else {
+      // 求旧值 
       oldValue = runner()
     }
   } else {
+    // 没有 cb 的情况 
     runner()
   }
-
+  
+  // 返回侦听器销毁函数 
   return () => {
     stop(runner)
     if (instance) {
+      // 移除组件 effects 对这个 runner 的引用 
       remove(instance.effects!, runner)
     }
   }
