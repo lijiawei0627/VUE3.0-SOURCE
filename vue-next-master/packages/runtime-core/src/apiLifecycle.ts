@@ -24,6 +24,7 @@ export function injectHook(
     // cache the error handling wrapper for injected hooks so the same hook
     // can be properly deduped by the scheduler. "__weh" stands for "with error
     // handling".
+    // 封装 hook 钩子函数并缓存 
     const wrappedHook =
       hook.__weh ||
       (hook.__weh = (...args: unknown[]) => {
@@ -32,13 +33,17 @@ export function injectHook(
         }
         // disable tracking inside all lifecycle hooks
         // since they can potentially be called inside effects.
+        // 停止依赖收集 
         pauseTracking()
         // Set currentInstance during hook invocation.
         // This assumes the hook does not synchronously trigger other hooks, which
         // can only be false when the user does something really funky.
+        // 设置 target 为当前运行的组件实例 
         setCurrentInstance(target)
+        // 执行钩子函数 
         const res = callWithAsyncErrorHandling(hook, target, type, args)
         setCurrentInstance(null)
+        // 恢复依赖收集 
         resetTracking()
         return res
       })
