@@ -128,6 +128,7 @@ export function createTransformContext(
 ): TransformContext {
   const context: TransformContext = {
     // options
+    // 配置
     prefixIdentifiers,
     hoistStatic,
     cacheHandlers,
@@ -144,6 +145,7 @@ export function createTransformContext(
     onError,
 
     // state
+    // 状态数据
     root,
     helpers: new Set(),
     components: new Set(),
@@ -199,15 +201,18 @@ export function createTransformContext(
       }
       if (!node || node === context.currentNode) {
         // current node removed
+        // 移除当前节点
         context.currentNode = null
         context.onNodeRemoved()
       } else {
         // sibling node removed
+        // 移除兄弟节点
         if (context.childIndex > removalIndex) {
           context.childIndex--
           context.onNodeRemoved()
         }
       }
+      // 移除节点
       context.parent!.children.splice(removalIndex, 1)
     },
     onNodeRemoved: () => {},
@@ -349,9 +354,11 @@ export function traverseNode(
 ) {
   context.currentNode = node
   // apply transform plugins
+  // 节点转换函数
   const { nodeTransforms } = context
   const exitFns = []
   for (let i = 0; i < nodeTransforms.length; i++) {
+    // 有些转换函数会设计一个退出函数，在处理完子节点后执行
     const onExit = nodeTransforms[i](node, context)
     if (onExit) {
       if (isArray(onExit)) {
@@ -362,9 +369,11 @@ export function traverseNode(
     }
     if (!context.currentNode) {
       // node was removed
+      // 节点被移除
       return
     } else {
       // node may have been replaced
+      // 因为在转换的过程中节点可能被替换，恢复到之前的节点
       node = context.currentNode
     }
   }
@@ -374,11 +383,13 @@ export function traverseNode(
       if (!context.ssr) {
         // inject import for the Comment symbol, which is needed for creating
         // comment nodes with `createVNode`
+        // 需要导入 createComment 辅助函数
         context.helper(CREATE_COMMENT)
       }
       break
     case NodeTypes.INTERPOLATION:
       // no need to traverse, but we need to inject toString helper
+      // 需要导入 toString 辅助函数
       if (!context.ssr) {
         context.helper(TO_DISPLAY_STRING)
       }
@@ -386,6 +397,7 @@ export function traverseNode(
 
     // for container types, further traverse downwards
     case NodeTypes.IF:
+      // 递归遍历每个分支节点
       for (let i = 0; i < node.branches.length; i++) {
         traverseNode(node.branches[i], context)
       }
@@ -394,11 +406,13 @@ export function traverseNode(
     case NodeTypes.FOR:
     case NodeTypes.ELEMENT:
     case NodeTypes.ROOT:
+      // 遍历子节点
       traverseChildren(node, context)
       break
   }
 
   // exit transforms
+  // 执行转换函数返回的退出函数
   context.currentNode = node
   let i = exitFns.length
   while (i--) {
@@ -415,10 +429,12 @@ export function createStructuralDirectiveTransform(
     : (n: string) => name.test(n)
 
   return (node, context) => {
+    // 只处理元素节点
     if (node.type === NodeTypes.ELEMENT) {
       const { props } = node
       // structural directive transforms are not concerned with slots
       // as they are handled separately in vSlot.ts
+      // 结构化指令的转换与插槽无关，插槽相关处理逻辑在 vSlot.ts 中
       if (node.tagType === ElementTypes.TEMPLATE && props.some(isVSlot)) {
         return
       }
@@ -429,6 +445,7 @@ export function createStructuralDirectiveTransform(
           // structural directives are removed to avoid infinite recursion
           // also we remove them *before* applying so that it can further
           // traverse itself in case it moves the node around
+          // 删除结构指令以避免无限递归
           props.splice(i, 1)
           i--
           const onExit = fn(node, prop, context)

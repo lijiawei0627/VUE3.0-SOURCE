@@ -114,6 +114,7 @@ export function processIf(
   }
 
   if (dir.name === 'if') {
+    // 处理 v-if 节点
     const branch = createIfBranch(node, dir)
     const ifNode: IfNode = {
       type: NodeTypes.IF,
@@ -126,6 +127,7 @@ export function processIf(
     }
   } else {
     // locate the adjacent v-if
+    // 处理 v-if 相邻节点，比如 v-else-if 和 v-else
     const siblings = context.parent!.children
     const comments = []
     let i = siblings.indexOf(node)
@@ -138,6 +140,7 @@ export function processIf(
       }
       if (sibling && sibling.type === NodeTypes.IF) {
         // move the node to the if node's branches
+        // 把节点移动到 IF 节点的 branches 中
         context.removeNode()
         const branch = createIfBranch(node, dir)
         if (__DEV__ && comments.length) {
@@ -165,11 +168,14 @@ export function processIf(
         const onExit = processCodegen && processCodegen(sibling, branch, false)
         // since the branch was removed, it will not be traversed.
         // make sure to traverse here.
+        // 因为分支已被删除，所以它的子节点需要在这里遍历
         traverseNode(branch, context)
         // call on exit
+        // 执行退出函数
         if (onExit) onExit()
         // make sure to reset currentNode after traversal to indicate this
         // node has been removed.
+        // 恢复 currentNode 为 null，因为它已经被移除
         context.currentNode = null
       } else {
         context.onError(

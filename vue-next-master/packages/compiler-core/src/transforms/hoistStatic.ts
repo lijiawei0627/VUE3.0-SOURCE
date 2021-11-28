@@ -58,17 +58,20 @@ function walk(
   // @vue/compiler-dom), but doing it here allows us to perform only one full
   // walk of the AST and allow `stringifyStatic` to stop walking as soon as its
   // stringficiation threshold is met.
+  // 是否包含运行时常量
   let hasRuntimeConstant = false
 
   const { children } = node
   for (let i = 0; i < children.length; i++) {
     const child = children[i]
     // only plain elements & text calls are eligible for hoisting.
+    // 只有普通元素和文本节点才能被静态提升
     if (
       child.type === NodeTypes.ELEMENT &&
       child.tagType === ElementTypes.ELEMENT
     ) {
       let staticType
+      // 获取静态节点的类型，如果是元素，则递归检查它的子节点
       if (
         !doNotHoistNode &&
         (staticType = getStaticType(child, resultCache)) > 0
@@ -77,14 +80,17 @@ function walk(
           hasRuntimeConstant = true
         }
         // whole tree is static
+        // 更新 patchFlag
         ;(child.codegenNode as VNodeCall).patchFlag =
           PatchFlags.HOISTED + (__DEV__ ? ` /* HOISTED */` : ``)
+          // 更新节点的 codegenNode
         child.codegenNode = context.hoist(child.codegenNode!)
         hasHoistedNode = true
         continue
       } else {
         // node may contain dynamic children, but its props may be eligible for
         // hoisting.
+        // 节点可能会包含一些动态子节点，但它的静态属性还是可以被静态提升
         const codegenNode = child.codegenNode!
         if (codegenNode.type === NodeTypes.VNODE_CALL) {
           const flag = getPatchFlag(codegenNode)
@@ -102,6 +108,7 @@ function walk(
         }
       }
     } else if (child.type === NodeTypes.TEXT_CALL) {
+      // 文本节点也可以静态提升
       const staticType = getStaticType(child.content, resultCache)
       if (staticType > 0) {
         if (staticType === StaticType.HAS_RUNTIME_CONSTANT) {
@@ -114,6 +121,7 @@ function walk(
 
     // walk further
     if (child.type === NodeTypes.ELEMENT) {
+       // 递归遍历子节点
       walk(child, context, resultCache)
     } else if (child.type === NodeTypes.FOR) {
       // Do not hoist v-for single child because it has to be a block
@@ -132,6 +140,7 @@ function walk(
   }
 
   if (!hasRuntimeConstant && hasHoistedNode && context.transformHoist) {
+    // 如果编译配置了 transformHoist，则执行
     context.transformHoist(children, context, node)
   }
 }

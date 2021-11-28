@@ -184,6 +184,7 @@ export function generate(
     onContextCreated?: (context: CodegenContext) => void
   } = {}
 ): CodegenResult {
+  // 创建代码生成上下文
   const context = createCodegenContext(ast, options)
   if (options.onContextCreated) options.onContextCreated(context)
   const {
@@ -201,6 +202,7 @@ export function generate(
   const genScopeId = !__BROWSER__ && scopeId != null && mode === 'module'
 
   // preambles
+  // 生成预设代码
   if (!__BROWSER__ && mode === 'module') {
     genModulePreamble(ast, context, genScopeId)
   } else {
@@ -226,6 +228,7 @@ export function generate(
   indent()
 
   if (useWithBlock) {
+    // 处理带 with 的情况，Web 端运行时编译
     push(`with (_ctx) {`)
     indent()
     // function mode const declarations should be inside with block
@@ -242,18 +245,21 @@ export function generate(
   }
 
   // generate asset resolution statements
+  // 生成自定义组件声明代码
   if (ast.components.length) {
     genAssets(ast.components, 'component', context)
     if (ast.directives.length || ast.temps > 0) {
       newline()
     }
   }
+  // 生成自定义指令声明代码
   if (ast.directives.length) {
     genAssets(ast.directives, 'directive', context)
     if (ast.temps > 0) {
       newline()
     }
   }
+  // 生成临时变量代码
   if (ast.temps > 0) {
     push(`let `)
     for (let i = 0; i < ast.temps; i++) {
@@ -269,6 +275,7 @@ export function generate(
   if (!ssr) {
     push(`return `)
   }
+  // 生成创建 VNode 树的表达式
   if (ast.codegenNode) {
     genNode(ast.codegenNode, context)
   } else {
